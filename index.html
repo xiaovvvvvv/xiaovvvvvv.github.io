@@ -1,0 +1,314 @@
+10.07 06:55
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>星空·许愿</title>
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+    }
+    body, html {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: radial-gradient(circle at 50% 50%, #111122, #000000);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+    }
+    #starfield {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+    }
+    .header {
+        position: absolute;
+        top: 10%;
+        width: 100%;
+        text-align: center;
+        z-index: 2;
+        pointer-events: none;
+        color: #fff;
+    }
+    .header h1 {
+        font-size: 24px;
+        font-weight: 400;
+        letter-spacing: 4px;
+        margin-bottom: 10px;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    .header p {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.5);
+        letter-spacing: 2px;
+    }
+    #toast {
+        position: absolute;
+        bottom: 110px;
+        left: 50%;
+        transform: translateX(-50%) translateY(20px);
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        color: #fff;
+        padding: 8px 20px;
+        border-radius: 30px;
+        font-size: 13px;
+        letter-spacing: 1px;
+        opacity: 0;
+        transition: all 0.5s ease;
+        z-index: 4;
+        pointer-events: none;
+        white-space: nowrap;
+    }
+    #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    .input-area {
+        position: absolute;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 500px;
+        display: flex;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(10px);
+        border-radius: 30px;
+        padding: 5px 5px 5px 20px;
+        z-index: 5;
+        transition: border-color 0.3s;
+    }
+    .input-area:focus-within {
+        border-color: rgba(255, 255, 255, 0.4);
+    }
+    .input-area input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #fff;
+        font-size: 15px;
+        height: 40px;
+    }
+    .input-area input::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+        letter-spacing: 1px;
+    }
+    .input-area button {
+        background: #ffffff;
+        color: #000000;
+        border: none;
+        border-radius: 25px;
+        padding: 0 20px;
+        height: 40px;
+        font-size: 14px;
+        font-weight: bold;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .input-area button:hover {
+        background: #e0e0e0;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+    }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="header">
+    <h1>星 空 · 许 愿</h1>
+    <p>点击夜空，让流星更多</p>
+</div>
+<div id="toast">愿望已化作流星 ✦</div>
+<div class="input-area">
+    <input type="text" id="wishInput" placeholder="写下你的愿望..." maxlength="20">
+    <button id="flyBtn">放飞</button>
+</div>
+<script>
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+    let stars = [];
+    let meteors = [];
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        initStars();
+    }
+    window.addEventListener('resize', resize);
+    function initStars() {
+        stars = [];
+        const numStars = Math.floor((width * height) / 2500);
+        for (let i = 0; i < numStars; i++) {
+            stars.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                radius: Math.random() * 1.2,
+                alpha: Math.random(),
+                speed: Math.random() * 0.02 + 0.005,
+                direction: Math.random() > 0.5 ? 1 : -1
+            });
+        }
+    }
+    // 流星类
+    class Meteor {
+        constructor(isWish = false, wishText = '') {
+            this.isWish = isWish;
+            this.wishText = wishText;
+            this.reset();
+        }
+        reset() {
+            if (this.isWish) {
+                // 许愿流星：从屏幕左上角出发，匹配红线位置
+                this.x = width * 0.05; // 屏幕左侧边缘附近
+                this.y = height * 0.05; // 屏幕顶部附近
+                this.len = 250; // 尾巴稍微长一点，更明显
+                this.speed = 1.5; // 保持慢速
+                this.size = 2.5; 
+                this.angle = Math.PI / 4; // 绝对锁定45度角
+                this.alpha = 1;
+            } else {
+                // 普通流星：绝对平行，满屏分布
+                this.x = Math.random() * width * 1.5 - width * 0.5;
+                this.y = Math.random() * height * 1.5 - height * 0.5;
+                this.len = Math.random() * 150 + 80;
+                this.speed = Math.random() * 8 + 5; // 速度可以不同，增加层次感
+                this.size = Math.random() * 1.5 + 0.5;
+                this.angle = Math.PI / 4; // 绝对锁定45度角
+                this.alpha = Math.random() * 0.7 + 0.3;
+            }
+        }
+        update() {
+            this.x += Math.cos(this.angle) * this.speed;
+            this.y += Math.sin(this.angle) * this.speed;
+            if (this.x > width + 400 || this.y > height + 400 || this.x < -400 || this.y < -400) {
+                if (this.isWish) {
+                    this.active = false;
+                } else {
+                    this.reset();
+                }
+            }
+        }
+        draw() {
+            if (this.active === false) return;
+            ctx.save();
+            ctx.beginPath();
+            const gradient = ctx.createLinearGradient(
+                this.x, this.y,
+                this.x - Math.cos(this.angle) * this.len,
+                this.y - Math.sin(this.angle) * this.len
+            );
+            if (this.isWish) {
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${this.alpha})`);
+                gradient.addColorStop(0.3, `rgba(255, 215, 0, 0.8)`);
+                gradient.addColorStop(1, 'rgba(255, 215, 0, 0)');
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffd700';
+            } else {
+                gradient.addColorStop(0, `rgba(255, 255, 255, ${this.alpha})`);
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            }
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = this.size;
+            ctx.lineCap = 'round';
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(
+                this.x - Math.cos(this.angle) * this.len,
+                this.y - Math.sin(this.angle) * this.len
+            );
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size * 2, 0, Math.PI * 2);
+            ctx.fillStyle = this.isWish ? '#ffd700' : `rgba(255, 255, 255, ${this.alpha})`;
+            ctx.fill();
+            if (this.isWish && this.wishText) {
+                ctx.font = '16px "Microsoft YaHei", sans-serif';
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ffd700';
+                ctx.fillText(this.wishText, this.x, this.y - 25);
+            }
+            ctx.restore();
+        }
+    }
+    function addMeteors(count) {
+        for (let i = 0; i < count; i++) {
+            meteors.push(new Meteor(false));
+        }
+    }
+    function initMeteors() {
+        addMeteors(window.innerWidth < 768 ? 25 : 50); 
+    }
+    window.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+            addMeteors(5);
+        }
+    });
+    function animate() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.fillRect(0, 0, width, height);
+        stars.forEach(star => {
+            star.alpha += star.speed * star.direction;
+            if (star.alpha <= 0.1 || star.alpha >= 0.9) {
+                star.direction *= -1;
+            }
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+            ctx.fill();
+        });
+        for (let i = meteors.length - 1; i >= 0; i--) {
+            meteors[i].update();
+            meteors[i].draw();
+            if (meteors[i].active === false) {
+                meteors.splice(i, 1);
+            }
+        }
+        if (meteors.length > 120) {
+            meteors = meteors.slice(-120);
+        }
+        requestAnimationFrame(animate);
+    }
+    const wishInput = document.getElementById('wishInput');
+    const flyBtn = document.getElementById('flyBtn');
+    const toast = document.getElementById('toast');
+    function flyWish() {
+        const text = wishInput.value.trim();
+        if (!text) {
+            wishInput.style.borderBottom = '1px solid rgba(255,80,80,0.8)';
+            setTimeout(() => { wishInput.style.borderBottom = 'none'; }, 1000);
+            return;
+        }
+        wishInput.value = '';
+        wishInput.blur();
+        // 生成许愿流星
+        const wishMeteor = new Meteor(true, text);
+        meteors.push(wishMeteor);
+        addMeteors(10);
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3000);
+    }
+    flyBtn.addEventListener('click', flyWish);
+    wishInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') flyWish();
+    });
+    resize();
+    initMeteors();
+    animate();
+</script>
+</body>
+</html>
+
